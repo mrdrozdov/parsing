@@ -2,7 +2,6 @@ import unittest
 
 
 class DioraModelTest(unittest.TestCase):
-
     def setUp(self):
         pass
 
