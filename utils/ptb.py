@@ -54,6 +54,7 @@ def get_raw_data():
             obj['sent_id'] = sent_sofar
             obj['words'] = words
             obj['part_of_speech'] = part_of_speech
+            obj['constituency_parse'] = constituency_parse
             sent_sofar += 1
             obj_sofar += 1
 

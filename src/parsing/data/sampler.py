@@ -1,8 +1,14 @@
+import collections
+
 import torch
+
+import numpy as np
+
+from ..utils import get_logger
 
 
 class FixedLengthBatchSampler(torch.utils.data.Sampler):
-    def __init__(self, data_source, batch_size, include_partial=False, rng=None, length_to_size=None):
+    def __init__(self, data_source, batch_size, include_partial=False, rng=None):
         self.data_source = data_source
         self.active = False
         if rng is None:
@@ -10,22 +16,7 @@ class FixedLengthBatchSampler(torch.utils.data.Sampler):
         self.rng = rng
         self.batch_size = batch_size
         self.include_partial = include_partial
-        self.length_to_size = length_to_size
-        self._batch_size_cache = {0: self.batch_size}
         self.logger = get_logger()
-
-    def get_batch_size(self, length):
-        if self.length_to_size is None:
-            return self.batch_size
-        if length in self._batch_size_cache:
-            return self._batch_size_cache[length]
-        start = max(self._batch_size_cache.keys())
-        batch_size = self._batch_size_cache[start]
-        for n in range(start + 1, length + 1):
-            if n in self.length_to_size:
-                batch_size = self.length_to_size[n]
-            self._batch_size_cache[n] = batch_size
-        return batch_size
 
     def reset(self):
         """
@@ -40,7 +31,7 @@ class FixedLengthBatchSampler(torch.utils.data.Sampler):
         """
 
         # Record the lengths of each example.
-        length_map = OrderedDict()
+        length_map = collections.OrderedDict()
         for i in range(len(self.data_source)):
             x = self.data_source.dataset[i]
             length_map.setdefault(len(x), []).append(i)
@@ -52,7 +43,7 @@ class FixedLengthBatchSampler(torch.utils.data.Sampler):
         # Initialize state.
         state = {}
         for length, arr in length_map.items():
-            batch_size = self.get_batch_size(length)
+            batch_size = self.batch_size
             nbatches = len(arr) // batch_size
             surplus = nbatches * batch_size < len(arr)
             state[length] = dict(nbatches=nbatches, surplus=surplus, position=-1)
@@ -62,7 +53,7 @@ class FixedLengthBatchSampler(torch.utils.data.Sampler):
         for length, v in state.items():
             order += [length] * v["nbatches"]
 
-        ## Optionally, add partial batches.
+        # Optionally, add partial batches.
         if self.include_partial:
             for length, v in state.items():
                 if v["surplus"]:
@@ -78,7 +69,7 @@ class FixedLengthBatchSampler(torch.utils.data.Sampler):
         self.index = -1
 
     def get_next_batch(self, length):
-        batch_size = self.get_batch_size(length)
+        batch_size = self.batch_size
         position = self.state[length]["position"] + 1
         start = position * batch_size
         batch_index = self.length_map[length][start : start + batch_size]
